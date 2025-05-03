@@ -1,21 +1,33 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { DollarSign, TrendingUp, TrendingDown, Landmark } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { DollarSign, TrendingUp, TrendingDown, Landmark, PiggyBank, Wallet, Info } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 import type { Expense, DebtCredit } from '@/types'; // Assuming types are defined
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 export default function Home() {
   // --- State for data from localStorage ---
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [debtCredits, setDebtCredits] = useState<DebtCredit[]>([]);
+  const [totalBudget, setTotalBudget] = useState<number>(0);
+  const [budgetInput, setBudgetInput] = useState<string>(''); // For the input field
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
 
   // --- Load data from localStorage ---
   useEffect(() => {
     setLoading(true);
     let loadedExpenses: Expense[] = [];
     let loadedDebtCredits: DebtCredit[] = [];
+    let loadedBudget: number = 0;
 
     // Load Expenses
     const storedExpenses = localStorage.getItem('pennywise_expenses');
@@ -27,7 +39,6 @@ export default function Home() {
         }));
       } catch (error) {
         console.error("Failed to parse expenses from local storage:", error);
-        // Optionally clear invalid data: localStorage.removeItem('pennywise_expenses');
       }
     }
 
@@ -41,8 +52,20 @@ export default function Home() {
         }));
       } catch (error) {
         console.error("Failed to parse debt/credit data from local storage:", error);
-        // Optionally clear invalid data: localStorage.removeItem('pennywise_debtcredits');
       }
+    }
+
+    // Load Budget
+    const storedBudget = localStorage.getItem('pennywise_budget');
+    if (storedBudget) {
+        try {
+            const parsedBudget = parseFloat(storedBudget);
+            if (!isNaN(parsedBudget) && parsedBudget >= 0) {
+                loadedBudget = parsedBudget;
+            }
+        } catch (error) {
+            console.error("Failed to parse budget from local storage:", error);
+        }
     }
 
     // Sort data by date descending before setting state
@@ -52,34 +75,69 @@ export default function Home() {
 
     setExpenses(loadedExpenses);
     setDebtCredits(loadedDebtCredits);
+    setTotalBudget(loadedBudget);
+    setBudgetInput(loadedBudget.toString()); // Initialize input field
     setLoading(false);
 
     // --- Add event listeners to update summary when storage changes ---
     const handleStorageChange = (event: StorageEvent) => {
-        if (event.key === 'pennywise_expenses' || event.key === 'pennywise_debtcredits') {
-            // Re-load data when relevant local storage items change
+        let shouldUpdate = false;
+        let updatedExpenses: Expense[] = expenses;
+        let updatedDebtCredits: DebtCredit[] = debtCredits;
+        let updatedBudget: number = totalBudget;
+
+        if (event.key === 'pennywise_expenses') {
              const updatedStoredExpenses = localStorage.getItem('pennywise_expenses');
-             const updatedStoredDebtCredits = localStorage.getItem('pennywise_debtcredits');
-
-             let updatedExpenses: Expense[] = [];
-             let updatedDebtCredits: DebtCredit[] = [];
-
              if (updatedStoredExpenses) {
                try {
                  updatedExpenses = JSON.parse(updatedStoredExpenses).map((exp: any) => ({ ...exp, date: new Date(exp.date) }));
+                 updatedExpenses.sort((a, b) => b.date.getTime() - a.date.getTime());
+                 shouldUpdate = true;
                } catch { /* handle error */ }
+             } else {
+                 updatedExpenses = []; // Clear if storage item is removed
+                 shouldUpdate = true;
              }
+        }
+        if (event.key === 'pennywise_debtcredits') {
+            const updatedStoredDebtCredits = localStorage.getItem('pennywise_debtcredits');
              if (updatedStoredDebtCredits) {
                 try {
                  updatedDebtCredits = JSON.parse(updatedStoredDebtCredits).map((item: any) => ({ ...item, date: new Date(item.date) }));
+                  updatedDebtCredits.sort((a, b) => b.date.getTime() - a.date.getTime());
+                  shouldUpdate = true;
                } catch { /* handle error */ }
+             } else {
+                 updatedDebtCredits = []; // Clear if storage item is removed
+                 shouldUpdate = true;
              }
+        }
+         if (event.key === 'pennywise_budget') {
+            const updatedStoredBudget = localStorage.getItem('pennywise_budget');
+             if (updatedStoredBudget) {
+                try {
+                    const parsedBudget = parseFloat(updatedStoredBudget);
+                    if (!isNaN(parsedBudget) && parsedBudget >= 0) {
+                        updatedBudget = parsedBudget;
+                        shouldUpdate = true;
+                    }
+               } catch { /* handle error */ }
+             } else {
+                 updatedBudget = 0; // Reset if storage item is removed
+                 setBudgetInput('0'); // Reset input field as well
+                 shouldUpdate = true;
+             }
+        }
 
-            updatedExpenses.sort((a, b) => b.date.getTime() - a.date.getTime());
-            updatedDebtCredits.sort((a, b) => b.date.getTime() - a.date.getTime());
 
+        if (shouldUpdate) {
             setExpenses(updatedExpenses);
             setDebtCredits(updatedDebtCredits);
+            setTotalBudget(updatedBudget);
+             // Only update budget input if the budget itself changed
+             if (event.key === 'pennywise_budget') {
+                setBudgetInput(updatedBudget.toString());
+             }
         }
     };
 
@@ -92,16 +150,49 @@ export default function Home() {
 
   }, []); // Empty dependency array means this runs once on mount and sets up listener
 
+
   // --- Calculations ---
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const totalOwedToYou = debtCredits.filter(dc => dc.type === 'credit').reduce((sum, dc) => sum + dc.amount, 0);
   const totalYouOwe = debtCredits.filter(dc => dc.type === 'debt').reduce((sum, dc) => sum + dc.amount, 0);
-  const netPosition = totalOwedToYou - totalYouOwe;
+  const netDebtCreditPosition = totalOwedToYou - totalYouOwe;
+  const availableBalance = totalBudget - totalExpenses;
 
   // --- Formatting Function ---
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
+
+  // --- Budget Handling ---
+  const handleSetBudget = () => {
+    const newBudgetValue = parseFloat(budgetInput);
+    if (!isNaN(newBudgetValue) && newBudgetValue >= 0) {
+        setTotalBudget(newBudgetValue);
+        try {
+            localStorage.setItem('pennywise_budget', newBudgetValue.toString());
+            toast({
+                title: 'Budget Updated',
+                description: `Total budget set to ${formatCurrency(newBudgetValue)}.`,
+            });
+        } catch (error) {
+            console.error("Failed to save budget to local storage:", error);
+             toast({
+                title: 'Error Saving Budget',
+                description: 'Could not save the budget.',
+                variant: 'destructive',
+            });
+        }
+    } else {
+      toast({
+        title: 'Invalid Budget Amount',
+        description: 'Please enter a valid non-negative number for the budget.',
+        variant: 'destructive',
+      });
+       // Reset input to current budget if invalid
+       setBudgetInput(totalBudget.toString());
+    }
+  };
+
 
   // --- Loading State ---
   if (loading) {
@@ -114,18 +205,78 @@ export default function Home() {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Financial Summary</h1>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {/* Total Expenses Card */}
+       {/* Budget Overview Card */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground">Total amount spent</p>
-          </CardContent>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                 <PiggyBank className="h-6 w-6" />
+                 Budget Overview
+                 </CardTitle>
+                 <CardDescription>Set your total budget and track your spending against it.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+                    <Label htmlFor="budget" className="whitespace-nowrap font-medium">Total Budget:</Label>
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <Input
+                            id="budget"
+                            type="number"
+                            placeholder="Enter total budget"
+                            value={budgetInput}
+                            onChange={(e) => setBudgetInput(e.target.value)}
+                            onBlur={handleSetBudget} // Optionally save on blur
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSetBudget(); }}
+                            className="max-w-[150px]"
+                            min="0"
+                            step="1"
+                        />
+                        <Button onClick={handleSetBudget}>Set Budget</Button>
+                    </div>
+                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                     <div className="flex items-center gap-3 p-4 border rounded-lg">
+                         <Wallet className="h-6 w-6 text-muted-foreground" />
+                         <div>
+                            <p className="text-sm text-muted-foreground">Available Balance</p>
+                            <p className={`text-xl font-bold ${availableBalance >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+                                {formatCurrency(availableBalance)}
+                            </p>
+                         </div>
+                         <TooltipProvider>
+                           <Tooltip>
+                             <TooltipTrigger asChild>
+                               <Info className="h-4 w-4 text-muted-foreground ml-auto cursor-help" />
+                             </TooltipTrigger>
+                             <TooltipContent>
+                               <p>Total Budget minus Total Expenses.</p>
+                             </TooltipContent>
+                           </Tooltip>
+                         </TooltipProvider>
+                     </div>
+                      <div className="flex items-center gap-3 p-4 border rounded-lg">
+                         <DollarSign className="h-6 w-6 text-muted-foreground" />
+                         <div>
+                            <p className="text-sm text-muted-foreground">Total Spent</p>
+                            <p className="text-xl font-bold">{formatCurrency(totalExpenses)}</p>
+                         </div>
+                          <TooltipProvider>
+                           <Tooltip>
+                             <TooltipTrigger asChild>
+                               <Info className="h-4 w-4 text-muted-foreground ml-auto cursor-help" />
+                             </TooltipTrigger>
+                             <TooltipContent>
+                               <p>Sum of all recorded expenses.</p>
+                             </TooltipContent>
+                           </Tooltip>
+                         </TooltipProvider>
+                     </div>
+                </div>
+            </CardContent>
         </Card>
+
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Changed grid to 3 cols */}
 
         {/* Total Owed To You Card */}
         <Card>
@@ -151,19 +302,29 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        {/* Net Position Card */}
+        {/* Net Debt/Credit Position Card */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Position</CardTitle>
+            <CardTitle className="text-sm font-medium">Net Debt/Credit</CardTitle>
             <Landmark className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${netPosition >= 0 ? 'text-accent-foreground' : 'text-destructive'}`}>
-              {formatCurrency(netPosition)}
+            <div className={`text-2xl font-bold ${netDebtCreditPosition >= 0 ? 'text-accent-foreground' : 'text-destructive'}`}>
+              {formatCurrency(netDebtCreditPosition)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {netPosition >= 0 ? 'Overall balance is positive' : 'Overall balance is negative'}
+              {netDebtCreditPosition >= 0 ? 'Overall debt/credit is positive' : 'Overall debt/credit is negative'}
             </p>
+             <TooltipProvider>
+               <Tooltip>
+                 <TooltipTrigger asChild>
+                   <Info className="h-3 w-3 text-muted-foreground mt-1 cursor-help" />
+                 </TooltipTrigger>
+                 <TooltipContent>
+                   <p>'Owed to You' minus 'You Owe'.</p>
+                 </TooltipContent>
+               </Tooltip>
+             </TooltipProvider>
           </CardContent>
         </Card>
       </div>
@@ -215,3 +376,4 @@ export default function Home() {
     </div>
   );
 }
+
