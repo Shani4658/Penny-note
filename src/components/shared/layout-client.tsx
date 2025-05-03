@@ -1,0 +1,88 @@
+'use client';
+
+import type React from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Home, Receipt, Users, Menu } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+  SidebarTrigger,
+  SidebarInset,
+} from '@/components/ui/sidebar';
+import { Button } from '@/components/ui/button';
+import { Toaster } from '@/components/ui/toaster'; // Import Toaster
+
+export function LayoutClient({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  const menuItems = [
+    { href: '/', label: 'Summary', icon: Home },
+    { href: '/expenses', label: 'Expenses', icon: Receipt },
+    { href: '/debts', label: 'Debts / Credits', icon: Users },
+  ];
+
+  return (
+    <SidebarProvider defaultOpen>
+      <Sidebar>
+        <SidebarHeader className="p-4">
+           <Link href="/" className="flex items-center gap-2 font-semibold text-lg text-primary">
+            {/* Simple SVG Logo - replace if you have a specific logo */}
+             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-6 w-6">
+              <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20Z" fill="currentColor"/>
+              <path d="M12 6C11.45 6 11 6.45 11 7V11H7C6.45 11 6 11.45 6 12C6 12.55 6.45 13 7 13H11V17C11 17.55 11.45 18 12 18C12.55 18 13 17.55 13 17V13H17C17.55 13 18 12.55 18 12C18 11.45 17.55 11 17 11H13V7C13 6.45 12.55 6 12 6Z" fill="currentColor"/>
+            </svg>
+            PennyWise
+           </Link>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarMenu>
+            {menuItems.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <Link href={item.href} legacyBehavior passHref>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.href}
+                    tooltip={item.label}
+                  >
+                    <a>
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.label}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter className="p-2">
+          {/* Footer content if needed */}
+        </SidebarFooter>
+      </Sidebar>
+      <SidebarInset>
+        <header className="flex h-14 items-center justify-between border-b bg-background px-4 lg:px-6 lg:justify-end">
+          <div className="lg:hidden">
+            {/* Mobile Trigger */}
+            <SidebarTrigger className="h-8 w-8">
+               <Menu />
+            </SidebarTrigger>
+          </div>
+          {/* Placeholder for potential user menu or other header elements */}
+          <div></div>
+        </header>
+        <main className="flex-1 p-4 md:p-6 lg:p-8">
+          {children}
+          <Toaster /> {/* Add Toaster here */}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
