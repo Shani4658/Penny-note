@@ -1,4 +1,4 @@
-'use client'; // Needs client-side state for dummy data
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -6,40 +6,91 @@ import { DollarSign, TrendingUp, TrendingDown, Landmark } from 'lucide-react';
 import type { Expense, DebtCredit } from '@/types'; // Assuming types are defined
 
 export default function Home() {
-  // --- Dummy Data State ---
-  // In a real app, this data would come from a state management solution or API calls
+  // --- State for data from localStorage ---
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [debtCredits, setDebtCredits] = useState<DebtCredit[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Simulate fetching data
+  // --- Load data from localStorage ---
   useEffect(() => {
-    // Replace with actual data fetching logic
-    const fetchDummyData = () => {
-       // Simulate delay
-       setTimeout(() => {
-        const dummyExpenses: Expense[] = [
-          { id: '1', amount: 25.50, date: new Date(2024, 6, 10), category: 'Food', description: 'Lunch with friends' },
-          { id: '2', amount: 120.00, date: new Date(2024, 6, 9), category: 'Groceries' },
-          { id: '3', amount: 50.00, date: new Date(2024, 6, 11), category: 'Transport', description: 'Monthly pass' },
-          { id: '4', amount: 15.00, date: new Date(2024, 6, 12), category: 'Coffee' },
-        ];
+    setLoading(true);
+    let loadedExpenses: Expense[] = [];
+    let loadedDebtCredits: DebtCredit[] = [];
 
-        const dummyDebtCredits: DebtCredit[] = [
-          { id: 'dc1', person: 'Alice', amount: 50.00, type: 'credit', date: new Date(2024, 6, 5), description: 'Borrowed for movie' },
-          { id: 'dc2', person: 'Bob', amount: 20.00, type: 'debt', date: new Date(2024, 6, 8), description: 'Shared taxi fare' },
-          { id: 'dc3', person: 'Charlie', amount: 100.00, type: 'credit', date: new Date(2024, 6, 1), description: 'Lent for textbook' },
-        ];
+    // Load Expenses
+    const storedExpenses = localStorage.getItem('pennywise_expenses');
+    if (storedExpenses) {
+      try {
+        loadedExpenses = JSON.parse(storedExpenses).map((exp: any) => ({
+          ...exp,
+          date: new Date(exp.date), // Ensure date is a Date object
+        }));
+      } catch (error) {
+        console.error("Failed to parse expenses from local storage:", error);
+        // Optionally clear invalid data: localStorage.removeItem('pennywise_expenses');
+      }
+    }
 
-        setExpenses(dummyExpenses);
-        setDebtCredits(dummyDebtCredits);
-        setLoading(false);
-      }, 500); // Simulate 500ms loading
+    // Load Debts/Credits
+    const storedDebtCredits = localStorage.getItem('pennywise_debtcredits');
+    if (storedDebtCredits) {
+      try {
+        loadedDebtCredits = JSON.parse(storedDebtCredits).map((item: any) => ({
+          ...item,
+          date: new Date(item.date), // Ensure date is a Date object
+        }));
+      } catch (error) {
+        console.error("Failed to parse debt/credit data from local storage:", error);
+        // Optionally clear invalid data: localStorage.removeItem('pennywise_debtcredits');
+      }
+    }
+
+    // Sort data by date descending before setting state
+    loadedExpenses.sort((a, b) => b.date.getTime() - a.date.getTime());
+    loadedDebtCredits.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+
+    setExpenses(loadedExpenses);
+    setDebtCredits(loadedDebtCredits);
+    setLoading(false);
+
+    // --- Add event listeners to update summary when storage changes ---
+    const handleStorageChange = (event: StorageEvent) => {
+        if (event.key === 'pennywise_expenses' || event.key === 'pennywise_debtcredits') {
+            // Re-load data when relevant local storage items change
+             const updatedStoredExpenses = localStorage.getItem('pennywise_expenses');
+             const updatedStoredDebtCredits = localStorage.getItem('pennywise_debtcredits');
+
+             let updatedExpenses: Expense[] = [];
+             let updatedDebtCredits: DebtCredit[] = [];
+
+             if (updatedStoredExpenses) {
+               try {
+                 updatedExpenses = JSON.parse(updatedStoredExpenses).map((exp: any) => ({ ...exp, date: new Date(exp.date) }));
+               } catch { /* handle error */ }
+             }
+             if (updatedStoredDebtCredits) {
+                try {
+                 updatedDebtCredits = JSON.parse(updatedStoredDebtCredits).map((item: any) => ({ ...item, date: new Date(item.date) }));
+               } catch { /* handle error */ }
+             }
+
+            updatedExpenses.sort((a, b) => b.date.getTime() - a.date.getTime());
+            updatedDebtCredits.sort((a, b) => b.date.getTime() - a.date.getTime());
+
+            setExpenses(updatedExpenses);
+            setDebtCredits(updatedDebtCredits);
+        }
     };
 
-    fetchDummyData();
-  }, []);
+    window.addEventListener('storage', handleStorageChange);
 
+    // Cleanup listener on component unmount
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+
+  }, []); // Empty dependency array means this runs once on mount and sets up listener
 
   // --- Calculations ---
   const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
@@ -54,7 +105,7 @@ export default function Home() {
 
   // --- Loading State ---
   if (loading) {
-    // Optional: Add a loading skeleton or spinner here
+    // Basic loading indicator
     return <div className="text-center p-10">Loading summary...</div>;
   }
 
@@ -117,7 +168,7 @@ export default function Home() {
         </Card>
       </div>
 
-        {/* Simple Recent Activity Lists (Optional - could be separate components) */}
+      {/* Recent Activity Lists using data from localStorage */}
       <div className="grid gap-6 md:grid-cols-2">
           {/* Recent Expenses */}
           <Card>
