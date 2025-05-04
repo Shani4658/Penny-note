@@ -21,6 +21,37 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // --- Function to Simulate Update After Payment ---
+  const simulateUpdateAfterPayment = () => {
+    // Simulate getting new data from payment
+    const newExpenses = [
+      { id: 'new-exp-1', category: 'Groceries', description: 'Weekly shopping', amount: 75.50, date: new Date() },
+      { id: 'new-exp-2', category: 'Dining', description: 'Dinner with friends', amount: 45.00, date: new Date() },
+    ];
+    const newDebtCredits = [
+      { id: 'new-dc-1', person: 'Alice', description: 'Loan repayment', amount: 100.00, type: 'credit', date: new Date() },
+      { id: 'new-dc-2', person: 'Bob', description: 'Borrowed for movie tickets', amount: 20.00, type: 'debt', date: new Date() },
+    ];
+    const newBudget = 1500;
+
+    // Update localStorage
+    try {
+      localStorage.setItem('pennywise_expenses', JSON.stringify([...expenses, ...newExpenses]));
+      localStorage.setItem('pennywise_debtcredits', JSON.stringify([...debtCredits, ...newDebtCredits]));
+      localStorage.setItem('pennywise_budget', newBudget.toString());
+      toast({
+        title: 'Updated After Payment',
+        description: 'The data was updated.',
+      });
+    } catch (error) {
+      console.error('Failed to save new data to local storage:', error);
+      toast({
+        title: 'Error Updating Data',
+        description: 'Could not update the data.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // --- Load data from localStorage ---
   useEffect(() => {
@@ -80,64 +111,10 @@ export default function Home() {
     setLoading(false);
 
     // --- Add event listeners to update summary when storage changes ---
+
     const handleStorageChange = (event: StorageEvent) => {
-        let shouldUpdate = false;
-        let updatedExpenses: Expense[] = expenses;
-        let updatedDebtCredits: DebtCredit[] = debtCredits;
-        let updatedBudget: number = totalBudget;
-
-        if (event.key === 'pennywise_expenses') {
-             const updatedStoredExpenses = localStorage.getItem('pennywise_expenses');
-             if (updatedStoredExpenses) {
-               try {
-                 updatedExpenses = JSON.parse(updatedStoredExpenses).map((exp: any) => ({ ...exp, date: new Date(exp.date) }));
-                 updatedExpenses.sort((a, b) => b.date.getTime() - a.date.getTime());
-                 shouldUpdate = true;
-               } catch { /* handle error */ }
-             } else {
-                 updatedExpenses = []; // Clear if storage item is removed
-                 shouldUpdate = true;
-             }
-        }
-        if (event.key === 'pennywise_debtcredits') {
-            const updatedStoredDebtCredits = localStorage.getItem('pennywise_debtcredits');
-             if (updatedStoredDebtCredits) {
-                try {
-                 updatedDebtCredits = JSON.parse(updatedStoredDebtCredits).map((item: any) => ({ ...item, date: new Date(item.date) }));
-                  updatedDebtCredits.sort((a, b) => b.date.getTime() - a.date.getTime());
-                  shouldUpdate = true;
-               } catch { /* handle error */ }
-             } else {
-                 updatedDebtCredits = []; // Clear if storage item is removed
-                 shouldUpdate = true;
-             }
-        }
-         if (event.key === 'pennywise_budget') {
-            const updatedStoredBudget = localStorage.getItem('pennywise_budget');
-             if (updatedStoredBudget) {
-                try {
-                    const parsedBudget = parseFloat(updatedStoredBudget);
-                    if (!isNaN(parsedBudget) && parsedBudget >= 0) {
-                        updatedBudget = parsedBudget;
-                        shouldUpdate = true;
-                    }
-               } catch { /* handle error */ }
-             } else {
-                 updatedBudget = 0; // Reset if storage item is removed
-                 setBudgetInput('0'); // Reset input field as well
-                 shouldUpdate = true;
-             }
-        }
-
-
-        if (shouldUpdate) {
-            setExpenses(updatedExpenses);
-            setDebtCredits(updatedDebtCredits);
-            setTotalBudget(updatedBudget);
-             // Only update budget input if the budget itself changed
-             if (event.key === 'pennywise_budget') {
-                setBudgetInput(updatedBudget.toString());
-             }
+        if (event.key && (event.key.startsWith('pennywise') )) {
+          simulateUpdateAfterPayment();
         }
     };
 
@@ -274,6 +251,9 @@ export default function Home() {
                 </div>
             </CardContent>
         </Card>
+
+        {/* Update after payment button */}
+        <Button id='update-payment-button' onClick={simulateUpdateAfterPayment}>Update after payment</Button>
 
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"> {/* Changed grid to 3 cols */}
